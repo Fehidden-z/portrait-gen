@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Replicate Portrait Generator v3</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f6f3; --surface: #ffffff; --border: #e2e0da;
+    --border-focus: #a09e98; --text: #1a1916; --text-muted: #6b6964;
+    --text-hint: #a09e98; --accent: #1a1916; --accent-light: #f0efe9;
+    --success-bg: #eaf3de; --success-text: #3b6d11;
+    --error-bg: #fcebeb; --error-text: #a32d2d;
+    --warn-bg: #fef9ec; --warn-text: #7a5c00;
+    --radius: 10px; --radius-sm: 6px;
+    --mono: 'SF Mono','Fira Code','Cascadia Code',monospace;
+    --sans: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; padding: 1.5rem 1rem; }
+  .container { max-width: 660px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
+  header { display: flex; align-items: baseline; gap: 10px; padding-bottom: 1rem; border-bottom: 0.5px solid var(--border); }
+  header h1 { font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
+  header span { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.1rem; display: flex; flex-direction: column; gap: 9px; }
+  .label { font-size: 11px; font-weight: 500; color: var(--text-muted); letter-spacing: .07em; text-transform: uppercase; }
+  .label-row { display: flex; align-items: center; justify-content: space-between; }
+  .badge { font-size: 10px; font-family: var(--mono); color: var(--text-hint); background: var(--accent-light); padding: 2px 7px; border-radius: 20px; }
+  input[type="password"] { width: 100%; font-family: var(--mono); font-size: 13px; padding: 9px 12px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); outline: none; transition: border-color .15s; }
+  input:focus { border-color: var(--border-focus); }
+  .hint { font-size: 11px; color: var(--text-hint); line-height: 1.5; }
+  .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .mode-btn { border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 12px; font-family: var(--sans); text-align: center; cursor: pointer; background: var(--bg); color: var(--text-muted); transition: all .12s; line-height: 1.5; }
+  .mode-btn:hover { background: var(--accent-light); color: var(--text); }
+  .mode-btn.active { border: 1.5px solid var(--accent); background: var(--accent); color: #fff; }
+  .model-select-wrap { position: relative; }
+  select { width: 100%; font-family: var(--mono); font-size: 12px; padding: 9px 32px 9px 12px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); outline: none; cursor: pointer; appearance: none; transition: border-color .15s; }
+  select:focus { border-color: var(--border-focus); }
+  .select-arrow { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-hint); font-size: 11px; }
+  .model-info { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { font-size: 10px; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; border: 0.5px solid var(--border); color: var(--text-muted); background: var(--bg); }
+  .tag.img2img { border-color: #97c459; color: #3b6d11; background: var(--success-bg); }
+  .tag.fast { border-color: #f0c040; color: #7a5c00; background: var(--warn-bg); }
+  .tag.premium { border-color: #c0a0f0; color: #5a00c0; background: #f5eeff; }
+  .model-desc { font-size: 11px; color: var(--text-hint); line-height: 1.55; }
+  .upload-zone { border: 1.5px dashed var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center; cursor: pointer; transition: all .15s; position: relative; }
+  .upload-zone:hover, .upload-zone.dragover { background: var(--accent-light); border-color: var(--border-focus); }
+  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; border: none; }
+  .upload-text { font-size: 12px; color: var(--text-muted); }
+  .upload-sub { font-size: 11px; color: var(--text-hint); margin-top: 3px; }
+  .ref-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 7px; }
+  .ref-thumb { position: relative; border-radius: var(--radius-sm); overflow: hidden; aspect-ratio: 1; border: 2px solid transparent; cursor: pointer; }
+  .ref-thumb.primary { border-color: var(--accent); }
+  .ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ref-thumb .thumb-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0); transition: background .15s; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .ref-thumb:hover .thumb-overlay { background: rgba(0,0,0,0.38); }
+  .thumb-btn { display: none; font-size: 10px; padding: 3px 6px; border-radius: 4px; border: none; cursor: pointer; font-weight: 500; }
+  .ref-thumb:hover .thumb-btn { display: inline-block; }
+  .thumb-btn.p { background: #fff; color: var(--accent); }
+  .thumb-btn.r { background: #e74c3c; color: #fff; }
+  .primary-label { position: absolute; bottom: 3px; left: 3px; font-size: 9px; font-weight: 600; font-family: var(--mono); text-transform: uppercase; background: var(--accent); color: #fff; padding: 1px 4px; border-radius: 3px; pointer-events: none; }
+  .strength-wrap { display: flex; align-items: center; gap: 10px; }
+  .strength-wrap input[type="range"] { flex: 1; height: 3px; accent-color: var(--accent); cursor: pointer; }
+  .strength-val { font-family: var(--mono); font-size: 12px; color: var(--text-muted); width: 30px; text-align: right; }
+  .size-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .size-btn { border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 7px 3px; font-size: 10px; font-family: var(--mono); text-align: center; cursor: pointer; background: var(--bg); color: var(--text-muted); line-height: 1.5; transition: all .12s; }
+  .size-btn:hover { background: var(--accent-light); color: var(--text); }
+  .size-btn.active { border: 1.5px solid var(--accent); background: var(--accent); color: #fff; }
+  textarea { width: 100%; font-family: var(--mono); font-size: 11px; line-height: 1.65; padding: 9px 11px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); resize: vertical; outline: none; transition: border-color .15s; }
+  textarea:focus { border-color: var(--border-focus); }
+  .steps-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .step-field label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .step-field input[type="number"] { width: 100%; font-family: var(--mono); font-size: 13px; padding: 7px 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); outline: none; }
+  .gen-btn { width: 100%; padding: 12px; font-size: 14px; font-weight: 500; cursor: pointer; border-radius: var(--radius); border: 0.5px solid var(--accent); background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity .15s; }
+  .gen-btn:hover { opacity: .85; }
+  .gen-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .status { display: none; align-items: center; gap: 10px; padding: 10px 13px; border-radius: var(--radius-sm); font-size: 13px; border: 0.5px solid var(--border); background: var(--bg); color: var(--text-muted); }
+  .status.loading { display: flex; }
+  .status.error { display: flex; background: var(--error-bg); color: var(--error-text); border-color: #f09595; }
+  .status.success { display: flex; background: var(--success-bg); color: var(--success-text); border-color: #97c459; }
+  .spinner { width: 13px; height: 13px; border: 2px solid #ccc; border-top-color: var(--text-muted); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #result-area { display: none; flex-direction: column; gap: 10px; }
+  #result-img { width: 100%; border-radius: var(--radius); border: 0.5px solid var(--border); display: block; }
+  .dl-btn { width: 100%; padding: 10px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: var(--surface); color: var(--text); transition: background .12s; }
+  .dl-btn:hover { background: var(--accent-light); }
+  footer { font-size: 11px; color: var(--text-hint); text-align: center; padding-top: .25rem; }
+  #neg-card { transition: opacity .2s; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Replicate Portrait Generator</h1>
+    <span>v3 · multi-model</span>
+  </header>
+
+  <!-- Token -->
+  <div class="card">
+    <div class="label">API Token</div>
+    <input type="password" id="token" placeholder="r8_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false" />
+    <div class="hint">replicate.com/account/api-tokens — ไม่ถูกบันทึก</div>
+  </div>
+
+  <!-- Mode -->
+  <div class="card">
+    <div class="label">โหมด</div>
+    <div class="mode-row">
+      <button class="mode-btn active" id="mode-txt2img" onclick="setMode('txt2img')">✦ Text → Image<br><small style="opacity:.7">สร้างจาก prompt</small></button>
+      <button class="mode-btn" id="mode-img2img" onclick="setMode('img2img')">⊕ Image + Text<br><small style="opacity:.7">ใช้รูป reference</small></button>
+    </div>
+  </div>
+
+  <!-- Model -->
+  <div class="card">
+    <div class="label-row">
+      <div class="label">โมเดล</div>
+      <div class="badge" id="model-count-badge">20 โมเดล</div>
+    </div>
+    <div class="model-select-wrap">
+      <select id="model-select" onchange="onModelChange()"></select>
+      <div class="select-arrow">▾</div>
+    </div>
+    <div class="model-info" id="model-tags"></div>
+    <div class="model-desc" id="model-desc-text"></div>
+  </div>
+
+  <!-- Reference Images -->
+  <div class="card" id="ref-section" style="display:none;">
+    <div class="label-row">
+      <div class="label">รูป Reference</div>
+      <div class="badge" id="ref-count-badge">0 รูป</div>
+    </div>
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" accept="image/*" multiple onchange="handleFiles(this.files)" />
+      <div class="upload-text">🖼 คลิกหรือลากรูปมาวาง</div>
+      <div class="upload-sub">JPG · PNG · WEBP · หลายรูปได้</div>
+    </div>
+    <div class="ref-grid" id="ref-grid" style="display:none;"></div>
+    <div id="strength-section" style="display:none;flex-direction:column;gap:8px;">
+      <div class="label-row">
+        <span class="label">Prompt Strength</span>
+        <span class="hint">น้อย=ใกล้รูป · มาก=ตาม prompt</span>
+      </div>
+      <div class="strength-wrap">
+        <input type="range" id="strength" min="0.1" max="0.95" step="0.05" value="0.6" oninput="document.getElementById('strength-val').textContent=parseFloat(this.value).toFixed(2)" />
+        <span class="strength-val" id="strength-val">0.60</span>
+      </div>
+    </div>
+    <div class="hint">⭑ คลิกรูปเพื่อตั้งเป็น Primary</div>
+  </div>
+
+  <!-- Size -->
+  <div class="card">
+    <div class="label">ขนาดภาพ</div>
+    <div class="size-grid">
+      <button class="size-btn active" data-w="832" data-h="1216" onclick="selectSize(this)">832×1216<br>2:3</button>
+      <button class="size-btn" data-w="768" data-h="1344" onclick="selectSize(this)">768×1344<br>9:16</button>
+      <button class="size-btn" data-w="896" data-h="1152" onclick="selectSize(this)">896×1152<br>4:5</button>
+      <button class="size-btn" data-w="1024" data-h="1024" onclick="selectSize(this)">1024×1024<br>1:1</button>
+    </div>
+  </div>
+
+  <!-- Prompts -->
+  <div class="card">
+    <div class="label">Positive Prompt</div>
+    <textarea id="pos" rows="10">Thai female 32yo, Monk 6 medium tan warm-neutral undertone,
+natural pore texture, soft round face, rounded jaw, gentle full cheeks,
+dark brown almond eyes single eyelid natural, medium-arch dark brows,
+medium-full lips, soft closed smile,
+short straight deep black bob jaw-length blunt-cut center-parted,
+hourglass figure
+
+standing relaxed slight S-curve, right hand resting at waist,
+left hand loose at side,
+anatomically correct hands five separate fingers,
+natural skin texture, subtle pore detail, soft subsurface scattering,
+asymmetric micro-detail, natural lip texture, soft jaw definition
+
+FG: weathered wooden pier planks, BG: turquoise tropical lagoon
+overwater bungalow mid-distance shallow focus, no other figures
+
+85mm f/1.8 medium full-body shot,
+soft diffused late-afternoon light from camera-left 5400K neutral,
+Kodak Portra 400 color grade,
+realistic iris depth, natural eye moisture, sharp catchlights,
+hyperrealistic sharp grain 9%, symmetrical eyes, single subject solo</textarea>
+  </div>
+
+  <div class="card" id="neg-card">
+    <div class="label-row">
+      <div class="label">Negative Prompt</div>
+      <span style="font-size:10px;color:var(--text-hint);" id="neg-support-note"></span>
+    </div>
+    <textarea id="neg" rows="4">deformed hands,fused fingers,missing fingers,six fingers,mutated hands,asymmetric eyes,bad anatomy,extra people,watermark,blurry,nsfw,plastic skin,airbrushed skin,smooth filter,glass eyes,doll face,overprocessed,symmetrical perfection,no yellow tint,no orange filter,no warm color grading,no golden hour over-saturation,no AI cinematic look,no game graphics,no over-stylized colors,no Instagram filter,no sepia tone,no cinema color grading,no over-saturated skin,no orange-tinted skin,no plastic hair,no helmet hair,no hair clumping,no artificial smoothness,no fair skin,no pale skin,no airbrushed face,no beauty filter,no glass skin,no long hair,no wavy voluminous hair,no AI portrait look</textarea>
+  </div>
+
+  <!-- Advanced -->
+  <div class="card">
+    <div class="label">Advanced</div>
+    <div class="steps-row">
+      <div class="step-field"><label>Steps</label><input type="number" id="steps" value="30" min="1" max="50" /></div>
+      <div class="step-field"><label>Guidance Scale</label><input type="number" id="guidance" value="7" min="1" max="20" step="0.5" /></div>
+    </div>
+  </div>
+
+  <button class="gen-btn" id="gen-btn" onclick="generate()">▶ สร้างภาพ</button>
+
+  <div class="status" id="status">
+    <div class="spinner" id="spinner"></div>
+    <span id="status-text"></span>
+  </div>
+
+  <div id="result-area">
+    <img id="result-img" alt="generated portrait" />
+    <button class="dl-btn" onclick="downloadImg()">↓ บันทึกภาพ</button>
+  </div>
+
+  <footer>token ไม่ถูกส่งไปที่ใดนอกจาก api.replicate.com</footer>
+</div>
+
+<script>
+const MODELS = [
+  { id:'black-forest-labs/flux-1.1-pro', label:'FLUX 1.1 Pro', group:'FLUX', tags:['premium'], img2img:false, negPrompt:false, desc:'คุณภาพสูงสุดของ FLUX 1.1 — prompt following ดีมาก เหมาะ portrait เชิงพาณิชย์' },
+  { id:'black-forest-labs/flux-dev', label:'FLUX Dev', group:'FLUX', tags:[], img2img:false, negPrompt:false, desc:'FLUX open-weight — คุณภาพดี ราคาถูกกว่า Pro' },
+  { id:'black-forest-labs/flux-schnell', label:'FLUX Schnell', group:'FLUX', tags:['fast'], img2img:false, negPrompt:false, defaultSteps:4, desc:'เร็วที่สุด — 4 steps เพียงพอ เหมาะ iterate เร็ว' },
+  { id:'black-forest-labs/flux-depth-dev', label:'FLUX Depth Dev', group:'FLUX', tags:['img2img'], img2img:true, negPrompt:false, imageField:'image', desc:'img2img รักษา depth/spatial — ดีสำหรับ retexture คง composition' },
+  { id:'black-forest-labs/flux-canny-dev', label:'FLUX Canny Dev', group:'FLUX', tags:['img2img'], img2img:true, negPrompt:false, imageField:'image', desc:'ControlNet-style — ใช้ edge map ควบคุม structure' },
+  { id:'black-forest-labs/flux-2-pro', label:'FLUX 2 Pro', group:'FLUX 2', tags:['premium','img2img'], img2img:true, negPrompt:false, imageField:'image', desc:'FLUX 2 รองรับ multi-reference สูงสุด 8 รูป — character consistency สูง' },
+  { id:'black-forest-labs/flux-2-schnell', label:'FLUX 2 Schnell', group:'FLUX 2', tags:['fast'], img2img:false, negPrompt:false, defaultSteps:4, desc:'FLUX 2 เวอร์ชันเร็ว' },
+  { id:'stability-ai/sdxl', label:'Stable Diffusion XL', group:'Stable Diffusion', tags:['img2img'], img2img:true, negPrompt:true, imageField:'image', strengthField:'prompt_strength', desc:'SDXL คลาสสิก — negative prompt ครบ community model มากที่สุด' },
+  { id:'stability-ai/stable-diffusion-3.5-large', label:'SD 3.5 Large', group:'Stable Diffusion', tags:[], img2img:false, negPrompt:true, desc:'SD 3.5 flagship — ความละเอียดสูง prompt adherence ดี' },
+  { id:'stability-ai/stable-diffusion-3.5-medium', label:'SD 3.5 Medium', group:'Stable Diffusion', tags:['fast'], img2img:false, negPrompt:true, desc:'SD 3.5 ขนาดกลาง — สมดุลคุณภาพ/ความเร็ว' },
+  { id:'bytedance/sdxl-lightning-4step', label:'SDXL Lightning 4-step', group:'Stable Diffusion', tags:['fast','img2img'], img2img:true, negPrompt:true, imageField:'image', defaultSteps:4, desc:'SDXL distilled 4 steps — เร็วมาก รองรับ img2img' },
+  { id:'lucataco/realvisxl-v2.0', label:'RealVisXL v2', group:'Portrait / Realistic', tags:['img2img'], img2img:true, negPrompt:true, imageField:'image', desc:'Fine-tune SDXL เน้น photorealism — ผิว แสง มือ ดีมาก ★ แนะนำ' },
+  { id:'lucataco/juggernaut-xl-v9', label:'Juggernaut XL v9', group:'Portrait / Realistic', tags:['img2img'], img2img:true, negPrompt:true, imageField:'image', desc:'SDXL checkpoint — ใบหน้า ผม anatomy ดีมาก ★ แนะนำ portrait' },
+  { id:'cjwbw/dreamshaper-xl-turbo', label:'DreamShaper XL Turbo', group:'Portrait / Realistic', tags:['fast','img2img'], img2img:true, negPrompt:true, imageField:'image', desc:'General purpose — รูปถ่าย อาร์ต อนิเมะ รองรับ Turbo' },
+  { id:'google/imagen-4', label:'Imagen 4 (Google)', group:'Other Labs', tags:['premium'], img2img:false, negPrompt:false, desc:'Google Imagen 4 — รายละเอียดสูงมาก เส้นผม ผิวหนัง texture คมชัด' },
+  { id:'google/imagen-4-fast', label:'Imagen 4 Fast (Google)', group:'Other Labs', tags:['fast'], img2img:false, negPrompt:false, desc:'Imagen 4 เร็ว — ราคาต่ำ เหมาะ draft' },
+  { id:'bytedance/seedream-4.5', label:'Seedream 4.5 (ByteDance)', group:'Other Labs', tags:['img2img'], img2img:true, negPrompt:false, imageField:'image', desc:'ByteDance — cinematic, lighting สมจริง รองรับ 4K' },
+  { id:'recraft-ai/recraft-v3', label:'Recraft V3', group:'Other Labs', tags:[], img2img:false, negPrompt:false, desc:'Design-first — text rendering ดี เหมาะโปสเตอร์' },
+  { id:'ideogram-ai/ideogram-v3-quality', label:'Ideogram V3 Quality', group:'Other Labs', tags:[], img2img:false, negPrompt:false, desc:'Graphic design — text rendering แม่นยำ layout สะอาด' },
+  { id:'xlabs-ai/flux-img2img', label:'FLUX img2img (xLabs)', group:'FLUX', tags:['img2img'], img2img:true, negPrompt:false, imageField:'image', strengthField:'strength', desc:'FLUX Dev fine-tune img2img — transformation คมชัด' },
+];
+
+let mode='txt2img', selW=832, selH=1216, imgUrl='', refImages=[], primaryId=null;
+
+window.addEventListener('DOMContentLoaded',()=>{ buildModelDropdown(); onModelChange(); setupDragDrop(); });
+
+function buildModelDropdown(){
+  const sel=document.getElementById('model-select');
+  sel.innerHTML='';
+  const filtered=mode==='img2img'?MODELS.filter(m=>m.img2img):MODELS;
+  const groups={};
+  filtered.forEach(m=>{ if(!groups[m.group])groups[m.group]=[]; groups[m.group].push(m); });
+  Object.entries(groups).forEach(([grp,models])=>{
+    const og=document.createElement('optgroup'); og.label=grp;
+    models.forEach(m=>{ const opt=document.createElement('option'); opt.value=m.id; opt.textContent=m.label+(m.tags.includes('fast')?' ⚡':m.tags.includes('premium')?' ★':''); og.appendChild(opt); });
+    sel.appendChild(og);
+  });
+  document.getElementById('model-count-badge').textContent=filtered.length+' โมเดล'+(mode==='img2img'?' (img2img)':'');
+}
+
+function onModelChange(){
+  const m=MODELS.find(x=>x.id===document.getElementById('model-select').value);
+  if(!m)return;
+  const tagWrap=document.getElementById('model-tags'); tagWrap.innerHTML='';
+  const labels={'img2img':'✓ img2img','fast':'⚡ fast','premium':'★ premium'};
+  m.tags.forEach(t=>{ const s=document.createElement('span'); s.className='tag '+t; s.textContent=labels[t]||t; tagWrap.appendChild(s); });
+  document.getElementById('model-desc-text').textContent=m.desc;
+  const nc=document.getElementById('neg-card');
+  nc.style.opacity=m.negPrompt?'1':'0.45';
+  nc.style.pointerEvents=m.negPrompt?'':'none';
+  document.getElementById('neg-support-note').textContent=m.negPrompt?'':'(โมเดลนี้ไม่รองรับ negative prompt)';
+  if(m.defaultSteps)document.getElementById('steps').value=m.defaultSteps;
+  else document.getElementById('steps').value=30;
+}
+
+function setMode(m){
+  mode=m;
+  document.getElementById('mode-txt2img').classList.toggle('active',m==='txt2img');
+  document.getElementById('mode-img2img').classList.toggle('active',m==='img2img');
+  document.getElementById('ref-section').style.display=m==='img2img'?'flex':'none';
+  buildModelDropdown(); onModelChange();
+}
+
+function handleFiles(files){
+  Array.from(files).forEach(file=>{
+    if(!file.type.startsWith('image/'))return;
+    const reader=new FileReader();
+    reader.onload=e=>{ const id='ref_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); refImages.push({id,dataUrl:e.target.result,name:file.name}); if(!primaryId)primaryId=id; renderRefGrid(); };
+    reader.readAsDataURL(file);
+  });
+}
+function removeRef(id){ refImages=refImages.filter(r=>r.id!==id); if(primaryId===id)primaryId=refImages[0]?.id||null; renderRefGrid(); }
+function setPrimary(id){ primaryId=id; renderRefGrid(); }
+function renderRefGrid(){
+  const grid=document.getElementById('ref-grid'),badge=document.getElementById('ref-count-badge'),str=document.getElementById('strength-section'),n=refImages.length;
+  badge.textContent=n+' รูป'; grid.style.display=n>0?'grid':'none'; str.style.display=n>0?'flex':'none';
+  grid.innerHTML='';
+  refImages.forEach(ref=>{
+    const ip=ref.id===primaryId,div=document.createElement('div');
+    div.className='ref-thumb'+(ip?' primary':'');
+    div.innerHTML=`<img src="${ref.dataUrl}" loading="lazy"/>${ip?'<div class="primary-label">Primary</div>':''}<div class="thumb-overlay">${!ip?`<button class="thumb-btn p" onclick="setPrimary('${ref.id}')">⭑</button>`:''}<button class="thumb-btn r" onclick="removeRef('${ref.id}')">✕</button></div>`;
+    grid.appendChild(div);
+  });
+}
+function setupDragDrop(){
+  const z=document.getElementById('upload-zone');
+  z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('dragover');});
+  z.addEventListener('dragleave',()=>z.classList.remove('dragover'));
+  z.addEventListener('drop',e=>{e.preventDefault();z.classList.remove('dragover');handleFiles(e.dataTransfer.files);});
+}
+
+function selectSize(el){ document.querySelectorAll('.size-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); selW=parseInt(el.dataset.w); selH=parseInt(el.dataset.h); }
+
+function setStatus(msg,type){ const s=document.getElementById('status'); s.className='status '+type; document.getElementById('spinner').style.display=type==='loading'?'block':'none'; document.getElementById('status-text').textContent=msg; }
+function hideStatus(){ document.getElementById('status').className='status'; }
+
+function buildPayload(m){
+  const input={ prompt:document.getElementById('pos').value.trim(), width:selW, height:selH, num_inference_steps:parseInt(document.getElementById('steps').value)||30, guidance_scale:parseFloat(document.getElementById('guidance').value)||7, num_outputs:1, scheduler:'DPMSolverMultistep' };
+  const neg=document.getElementById('neg').value.trim();
+  if(m.negPrompt&&neg)input.negative_prompt=neg;
+  if(mode==='img2img'&&m.img2img){
+    const primary=refImages.find(r=>r.id===primaryId);
+    if(primary){ input[m.imageField||'image']=primary.dataUrl; input[m.strengthField||'prompt_strength']=parseFloat(document.getElementById('strength').value); }
+  }
+  if(/flux|imagen|seedream|recraft|ideogram/.test(m.id)){ delete input.scheduler; delete input.guidance_scale; }
+  return input;
+}
+
+async function generate(){
+  const token=document.getElementById('token').value.trim();
+  if(!token){setStatus('กรุณากรอก API token','error');return;}
+  if(!token.startsWith('r8_')){setStatus('Token ต้องขึ้นต้นด้วย r8_','error');return;}
+  const m=MODELS.find(x=>x.id===document.getElementById('model-select').value);
+  if(!m){setStatus('กรุณาเลือกโมเดล','error');return;}
+  if(mode==='img2img'&&refImages.length===0){setStatus('กรุณาแนบรูป reference','error');return;}
+  document.getElementById('gen-btn').disabled=true;
+  document.getElementById('result-area').style.display='none';
+  setStatus(`กำลังส่ง… [${m.label}]`,'loading');
+  try{
+    const res=await fetch(`https://api.replicate.com/v1/models/${m.id}/predictions`,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'wait=20'},body:JSON.stringify({input:buildPayload(m)})});
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||e.error||'HTTP '+res.status);}
+    const data=await res.json();
+    const out=extractOutput(data);
+    if(out)showResult(out);
+    else if(data.id)pollResult(data.id,token,0);
+    else throw new Error('ไม่พบ prediction id');
+  }catch(err){setStatus('Error: '+err.message,'error');document.getElementById('gen-btn').disabled=false;}
+}
+
+function extractOutput(data){
+  if(data.status==='succeeded'){
+    if(Array.isArray(data.output)&&data.output[0])return data.output[0];
+    if(typeof data.output==='string')return data.output;
+  }return null;
+}
+
+async function pollResult(id,token,count){
+  if(count>80){setStatus('หมดเวลา — ลองใหม่','error');document.getElementById('gen-btn').disabled=false;return;}
+  setStatus(`กำลัง generate… (${count})`,'loading');
+  await new Promise(r=>setTimeout(r,3000));
+  try{
+    const res=await fetch('https://api.replicate.com/v1/predictions/'+id,{headers:{'Authorization':'Bearer '+token}});
+    const data=await res.json();
+    const out=extractOutput(data);
+    if(out)showResult(out);
+    else if(data.status==='failed'){setStatus('Failed: '+(data.error||'unknown'),'error');document.getElementById('gen-btn').disabled=false;}
+    else pollResult(id,token,count+1);
+  }catch(err){setStatus('Network error: '+err.message,'error');document.getElementById('gen-btn').disabled=false;}
+}
+
+function showResult(url){ imgUrl=url; hideStatus(); setStatus('สร้างภาพสำเร็จ ✓','success'); document.getElementById('result-img').src=url; document.getElementById('result-area').style.display='flex'; document.getElementById('gen-btn').disabled=false; }
+
+async function downloadImg(){
+  if(!imgUrl)return;
+  try{ const r=await fetch(imgUrl),blob=await r.blob(),a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='portrait_'+Date.now()+'.png'; a.click(); }
+  catch(e){ window.open(imgUrl,'_blank'); }
+}
+</script>
+</body>
+</html>
